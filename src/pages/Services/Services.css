@@ -3,3 +3,105 @@
   overflow-y: auto;
   background-color: var(--light-gray);
 }
+
+/* ── Booking step indicator ───────────────────────── */
+.booking-steps {
+  list-style: none;
+  display: flex;
+  gap: 8px;
+  padding: 20px 40px 0;
+  margin: 0;
+}
+
+.booking-step {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--dark-gray);
+  position: relative;
+}
+
+/* Connector line between steps */
+.booking-step:not(:last-child)::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  background: var(--border-color);
+  margin-left: 4px;
+  transition: background 0.4s ease;
+}
+
+.booking-step.done:not(:last-child)::after {
+  background: var(--primary-blue);
+}
+
+.step-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-weight: 700;
+  background: white;
+  border: 2px solid var(--border-color);
+  transition: all 0.3s ease;
+}
+
+.booking-step.current .step-dot {
+  border-color: var(--primary-blue);
+  color: var(--primary-blue);
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+
+.booking-step.done .step-dot {
+  background: var(--primary-blue);
+  border-color: var(--primary-blue);
+  color: white;
+}
+
+.booking-step.current .step-label {
+  color: var(--text-dark);
+  font-weight: 600;
+}
+
+.booking-error {
+  margin: 16px 40px 0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #FDECEA;
+  color: #C62828;
+  font-size: 14px;
+}
+
+.skeleton-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .booking-steps {
+    padding: 16px 16px 0;
+  }
+
+  /* Phone: show only the current step's label */
+  .booking-step .step-label {
+    display: none;
+  }
+
+  .booking-step.current .step-label {
+    display: inline;
+  }
+
+  .booking-error {
+    margin: 12px 16px 0;
+  }
+
+  .skeleton-row {
+    grid-template-columns: 1fr;
+  }
+}

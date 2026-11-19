@@ -51,18 +51,33 @@ function ServicesList({ services, onSelectService }: ServicesListProps) {
           />
         </div>
 
-        <div className="services-grid">
+        <div className="services-grid stagger">
           {filteredServices.length === 0 ? (
             <div className="no-services">
               <FaClipboardList className="empty-icon" style={{ color: '#2f6f73' }} />
-              <p>No services available</p>
-              <p className="empty-subtext">Services will be available soon</p>
+              {services.length === 0 ? (
+                <>
+                  <p>No services available</p>
+                  <p className="empty-subtext">Services will be available soon</p>
+                </>
+              ) : (
+                <>
+                  <p>No services match your search</p>
+                  <button
+                    className="clear-search-btn"
+                    onClick={() => { setSearchTerm(''); setSelectedServiceFilter('all') }}
+                  >
+                    Clear search
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             filteredServices.map(service => (
               <div key={service.id} className="service-card">
                 <h3>{service.name}</h3>
-                <p className="service-duration">{service.duration} minutes</p>
+                {service.description && <p className="service-description">{service.description}</p>}
+                <p className="service-duration">{service.duration} minutes per person</p>
                 <button
                   className="book-now-btn"
                   onClick={() => onSelectService(service)}

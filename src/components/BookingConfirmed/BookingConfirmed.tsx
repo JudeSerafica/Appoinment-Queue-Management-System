@@ -1,3 +1,4 @@
+import { formatDisplayTime } from '../../utils/date'
 import './BookingConfirmed.css'
 
 interface Service {
@@ -15,11 +16,13 @@ interface BookingData {
 interface BookingConfirmedProps {
   bookingData: BookingData
   queueNumber: number
-  onGoToDashboard: () => void
+  appointmentTime: string   // your personal time (slot start + your place in queue)
+  estimatedEnd?: string
+  onBookAnother: () => void
   onTrackQueue: () => void
 }
 
-function BookingConfirmed({ bookingData, queueNumber, onGoToDashboard, onTrackQueue }: BookingConfirmedProps) {
+function BookingConfirmed({ bookingData, queueNumber, appointmentTime, estimatedEnd, onBookAnother, onTrackQueue }: BookingConfirmedProps) {
   const formatDate = (dateString: string) => {
     const [year, month, day] = dateString.split('-')
     const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
@@ -29,9 +32,13 @@ function BookingConfirmed({ bookingData, queueNumber, onGoToDashboard, onTrackQu
   return (
     <div className="booking-confirmed">
       <div className="confirmed-container">
-        <div className="success-icon">✓</div>
+        {/* Animated checkmark: circle draws, then the tick */}
+        <svg className="success-check" viewBox="0 0 52 52" aria-hidden="true">
+          <circle className="check-circle" cx="26" cy="26" r="24" fill="none" />
+          <path className="check-tick" fill="none" d="M15 27l7 7 15-15" />
+        </svg>
         <h1>Appointment Booked!</h1>
-        <p className="confirmed-message">Your queue number has been assigned</p>
+        <p className="confirmed-message">Your queue number has been assigned. Please arrive a few minutes before your time.</p>
 
         <div className="queue-number-box">
           <div className="queue-label">Your Queue Number</div>
@@ -49,15 +56,18 @@ function BookingConfirmed({ bookingData, queueNumber, onGoToDashboard, onTrackQu
               <span className="detail-value">{formatDate(bookingData.date)}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">Time</span>
-              <span className="detail-value">{bookingData.time}</span>
+              <span className="detail-label">Your Time</span>
+              <span className="detail-value">
+                {formatDisplayTime(appointmentTime)}
+                {estimatedEnd && ` – ${formatDisplayTime(estimatedEnd)}`}
+              </span>
             </div>
           </div>
         )}
 
         <div className="confirmed-actions">
-          <button className="secondary-btn" onClick={onGoToDashboard}>
-            Go To Dashboard
+          <button className="secondary-btn" onClick={onBookAnother}>
+            Book Another
           </button>
           <button className="primary-btn" onClick={onTrackQueue}>
             Track Queue

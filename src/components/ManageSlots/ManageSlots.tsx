@@ -1,28 +1,55 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { FaTrash } from "react-icons/fa";
 import AddSlotModal from '../AddSlotModal/AddSlotModal'
 import './ManageSlots.css'
 import { useServices } from '../../contexts/ServicesContext'
-import { useSlots } from '../../contexts/SlotsContext'
+import { useSlots, TimeSlot } from '../../contexts/SlotsContext'
+import { useToast } from '../../contexts/ToastContext'
+import { toLocalDateString, formatDisplayTime } from '../../utils/date'
 
 function ManageSlots() {
   const { services } = useServices()
-  const { slots, addSlot, deleteSlot, fetchSlots } = useSlots()
+  const { slots, deleteSlot, fetchSlots } = useSlots()
+  const { showToast } = useToast()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [selectedServiceId, setSelectedServiceId] = useState<number | 'all'>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
   useEffect(() => { fetchSlots() }, [])
 
-  const handleAddSlot = (newSlot: { time: string; serviceName: string; capacity: number; serviceId: number; date: string }) => {
-    addSlot({ ...newSlot, booked: 0 } as any)
-    fetchSlots() // refresh from server after adding
-    setIsModalOpen(false)
-  }
+  const selectedKey = toLocalDateString(selectedDate)
+  const todayKey = toLocalDateString(new Date())
 
-  const filteredSlots = selectedServiceId === 'all'
-    ? slots
-    : slots.filter(slot => slot.serviceId === selectedServiceId)
+  // Slots matching the service filter (used for calendar dots)
+  const serviceSlots = useMemo(
+    () => selectedServiceId === 'all' ? slots : slots.filter(s => s.serviceId === selectedServiceId),
+    [slots, selectedServiceId]
+  )
+
+  // Table shows only the selected day, earliest first
+  const daySlots = useMemo(
+    () => serviceSlots
+      .filter(s => s.date === selectedKey)
+      .sort((a, b) => a.time.localeCompare(b.time) || a.serviceName.localeCompare(b.serviceName)),
+    [serviceSlots, selectedKey]
+  )
+
+  const datesWithSlots = useMemo(() => new Set(serviceSlots.map(s => s.date)), [serviceSlots])
+
+  const handleDelete = async (slot: TimeSlot) => {
+    if (slot.booked > 0) {
+      showToast(`Cannot delete: ${slot.booked} appointment(s) are booked in this slot.`, 'error')
+      return
+    }
+    const label = `${slot.serviceName} at ${formatDisplayTime(slot.time)}`
+    if (!window.confirm(`Delete the slot for ${label}?`)) return
+    setDeletingId(slot.id)
+    await deleteSlot(slot.id)
+    setDeletingId(null)
+    await fetchSlots()
+    showToast('Slot deleted', 'success')
+  }
 
   const getDaysInMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
   const getFirstDayOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay()
@@ -30,11 +57,18 @@ function ManageSlots() {
   const monthName = selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
   const daysInMonth = getDaysInMonth(selectedDate)
   const firstDay = getFirstDayOfMonth(selectedDate)
-  const paddedDays = Array(firstDay).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1))
+  const paddedDays: (number | null)[] = Array(firstDay).fill(null)
+    .concat(Array.from({ length: daysInMonth }, (_, i) => i + 1))
+
+  const dayKey = (day: number) =>
+    toLocalDateString(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day))
 
   const selectedDateStr = selectedDate.toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   })
+
+  const totalCapacity = daySlots.reduce((sum, s) => sum + s.capacity, 0)
+  const totalBooked = daySlots.reduce((sum, s) => sum + s.booked, 0)
 
   return (
     <div className="manage-slots">
@@ -46,20 +80,37 @@ function ManageSlots() {
       <div className="slots-container">
         <div className="calendar-section">
           <div className="calendar-header">
-            <button onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1))}>‹</button>
+            <button
+              aria-label="Previous month"
+              onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1))}
+            >‹</button>
             <h3>{monthName}</h3>
-            <button onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1))}>›</button>
+            <button
+              aria-label="Next month"
+              onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1))}
+            >›</button>
           </div>
           <div className="calendar-grid">
             {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d} className="weekday">{d}</div>)}
-            {paddedDays.map((day, idx) => (
-              <div
+            {paddedDays.map((day, idx) => day === null ? (
+              <div key={idx} className="calendar-day empty" />
+            ) : (
+              <button
                 key={idx}
-                className={`calendar-day ${!day ? 'empty' : ''} ${day === selectedDate.getDate() ? 'selected' : ''}`}
-                onClick={() => day && setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day))}
-              >{day}</div>
+                className={[
+                  'calendar-day',
+                  day === selectedDate.getDate() ? 'selected' : '',
+                  dayKey(day) === todayKey ? 'today' : '',
+                  dayKey(day) < todayKey ? 'past' : '',
+                ].filter(Boolean).join(' ')}
+                onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day))}
+              >
+                {day}
+                {datesWithSlots.has(dayKey(day)) && <span className="slot-dot" />}
+              </button>
             ))}
           </div>
+          <button className="today-btn" onClick={() => setSelectedDate(new Date())}>Today</button>
         </div>
 
         <div className="slots-section">
@@ -75,13 +126,17 @@ function ManageSlots() {
               </select>
               <span className="date-display">{selectedDateStr}</span>
             </div>
+            {daySlots.length > 0 && (
+              <span className="day-summary">
+                {daySlots.length} slot{daySlots.length !== 1 ? 's' : ''} · {totalBooked}/{totalCapacity} booked
+              </span>
+            )}
           </div>
 
           <div className="slots-table-container">
             <table className="slots-table">
               <thead>
                 <tr>
-                  <th>Date</th>
                   <th>Time</th>
                   <th>Service</th>
                   <th>Capacity</th>
@@ -90,36 +145,44 @@ function ManageSlots() {
                 </tr>
               </thead>
               <tbody>
-                {filteredSlots.map(slot => (
+                {daySlots.map(slot => (
                   <tr key={slot.id}>
-                    <td>{slot.date}</td>
-                    <td>{slot.time}</td>
+                    <td>{formatDisplayTime(slot.time)}</td>
                     <td>{slot.serviceName}</td>
                     <td>{slot.capacity}</td>
-                    <td className="booked-cell">{slot.booked}/{slot.capacity}</td>
+                    <td className="booked-cell">
+                      <span className={slot.booked >= slot.capacity ? 'full' : ''}>
+                        {slot.booked}/{slot.capacity}{slot.booked >= slot.capacity && ' · Full'}
+                      </span>
+                    </td>
                     <td className="actions-cell">
-                      <button className="btn-delete-slot" onClick={() => deleteSlot(slot.id)} title="Delete Slot">
-                        <FaTrash color="red" />
+                      <button
+                        className="btn-delete-slot"
+                        onClick={() => handleDelete(slot)}
+                        disabled={deletingId === slot.id}
+                        title={slot.booked > 0 ? 'Slot has bookings and cannot be deleted' : 'Delete Slot'}
+                      >
+                        <FaTrash color={slot.booked > 0 ? '#bbb' : 'red'} />
                       </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {filteredSlots.length === 0 && (
+            {daySlots.length === 0 && (
               <div className="empty-state">
-                <p>No slots found. Click "Add Slots" to create one.</p>
+                <p>No slots on this date. Dates with a dot have slots, or click "Add Slots" to create some.</p>
               </div>
             )}
           </div>
         </div>
       </div>
 
-     {isModalOpen && (
+      {isModalOpen && (
         <AddSlotModal
           onClose={() => setIsModalOpen(false)}
-          onAddSlot={handleAddSlot}
-          onDone={() => fetchSlots()}       // ← auto-refresh after generation
+          onAddSlot={() => { /* list is reloaded from the server in onDone */ }}
+          onDone={() => fetchSlots()}   // the modal itself reports created/failed counts
           selectedDate={selectedDate}
           services={services}
         />

@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import './AddSlotModal.css'
 import { Service } from '../../contexts/ServicesContext'
 import { createSlot } from '../../api/routes'
+import { toLocalDateString } from '../../utils/date'
 
 interface AddSlotModalProps {
   onClose: () => void
@@ -38,6 +39,7 @@ function AddSlotModal({ onClose, onAddSlot, onDone, selectedDate, services }: Ad
   })
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState(0)   // how many slots created so far
+  const [total, setTotal] = useState(0)         // how many slots are being created
   const [error, setError] = useState('')
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [displayMonth, setDisplayMonth] = useState(new Date(selectedDate))
@@ -98,19 +100,30 @@ function AddSlotModal({ onClose, onAddSlot, onDone, selectedDate, services }: Ad
       return
     }
 
+    const dateStr = toLocalDateString(formData.date)
+    // The server rejects slots in the past, so skip times that have already passed
+    const now = new Date()
+    const futureSlots = generatedSlots.filter(t => new Date(`${dateStr}T${t}`) > now)
+    const skipped = generatedSlots.length - futureSlots.length
+
+    if (futureSlots.length === 0) {
+      setError('All selected times are already in the past. Choose a later date or time.')
+      return
+    }
+
     setLoading(true)
     setProgress(0)
+    setTotal(futureSlots.length)
 
     try {
       const token = localStorage.getItem('token') || ''
-      const dateStr = formData.date.toISOString().split('T')[0]
       const svc = activeServices.find(s => s.id === formData.serviceId)
 
       let failCount = 0
 
       // Sequential so progress bar is accurate
-      for (let i = 0; i < generatedSlots.length; i++) {
-        const time = generatedSlots[i]
+      for (let i = 0; i < futureSlots.length; i++) {
+        const time = futureSlots[i]
         const res = await createSlot({
           service_id: formData.serviceId,
           slot_date: dateStr,
@@ -139,7 +152,8 @@ function AddSlotModal({ onClose, onAddSlot, onDone, selectedDate, services }: Ad
 
       // Always refresh parent slots list then close
       onDone()
-      if (failCount === 0) onClose()
+      if (failCount === 0 && skipped === 0) onClose()
+      else if (failCount === 0) setError(`${skipped} past time slot(s) were skipped. ${futureSlots.length} created.`)
 
     } catch {
       setError('Cannot connect to server.')
@@ -156,8 +170,8 @@ function AddSlotModal({ onClose, onAddSlot, onDone, selectedDate, services }: Ad
     .concat(Array.from({ length: getDaysInMonth(displayMonth) }, (_, i) => i + 1))
   const dateLabel = formData.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
-  const progressPct = generatedSlots.length > 0
-    ? Math.round((progress / generatedSlots.length) * 100)
+  const progressPct = total > 0
+    ? Math.round((progress / total) * 100)
     : 0
 
   return (
@@ -258,7 +272,7 @@ function AddSlotModal({ onClose, onAddSlot, onDone, selectedDate, services }: Ad
           {loading && (
             <div className="progress-wrap">
               <div className="progress-bar" style={{ width: `${progressPct}%` }} />
-              <span className="progress-label">{progress} / {generatedSlots.length} created</span>
+              <span className="progress-label">{progress} / {total} created</span>
             </div>
           )}
 

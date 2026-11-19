@@ -102,7 +102,7 @@
 
 .queue-info-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 15px;
   margin-bottom: 25px;
 }
@@ -150,9 +150,10 @@
 
 .progress-fill {
   height: 100%;
-  width: 70%;
-  background-color: var(--success-green);
+  width: 0;
+  background: linear-gradient(90deg, #3f8f95, var(--success-green));
   border-radius: 4px;
+  transition: width 0.8s ease;
 }
 
 .progress-info {
@@ -238,10 +239,208 @@
   }
 
   .queue-info-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .current-top {
+    flex-direction: column;
   }
 
   .queue-content {
     padding: 20px;
   }
+}
+
+/* ── Live queue additions ─────────────────────────── */
+.live-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success-green);
+  animation: live-blink 1.6s ease-in-out infinite;
+}
+
+@keyframes live-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.25; }
+}
+
+.refresh-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.refresh-icon.spinning {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.appointment-item.current {
+  flex-direction: column;
+  align-items: stretch;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  min-height: 0;
+}
+
+.appointment-item.current.is-serving .queue-info-box.highlight {
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+
+.your-turn-banner {
+  background: linear-gradient(90deg, #3f8f95, #2f6f73);
+  color: white;
+  font-weight: 700;
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  animation: pop-in 0.5s ease-out both;
+}
+
+.current-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.appointment-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.appointment-info strong {
+  font-size: 16px;
+}
+
+.appointment-info span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--dark-gray);
+}
+
+.queue-info-box {
+  background-color: #EAF4F5;
+}
+
+.queue-info-box.highlight {
+  background: linear-gradient(135deg, #3f8f95, #2f6f73);
+}
+
+.queue-info-box.highlight .info-label,
+.queue-info-box.highlight .info-value {
+  color: white;
+}
+
+.info-value.small {
+  font-size: 20px;
+  line-height: 38px;
+}
+
+.current-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.cancel-appointment-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  color: #e53935;
+  border: 2px solid #f5c6c4;
+  padding: 8px 16px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.cancel-appointment-btn:hover:not(:disabled) {
+  background: #e53935;
+  border-color: #e53935;
+  color: white;
+}
+
+.cancel-appointment-btn:disabled,
+.cancel-link:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.appointment-item {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.item-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.item-side .status-badge {
+  margin-bottom: 0;
+}
+
+.cancel-link {
+  background: none;
+  padding: 0;
+  color: #e53935;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cancel-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.appointment-item.clickable {
+  background: white;
+  border: 1px solid var(--border-color);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.appointment-item.clickable:hover {
+  transform: translateY(-2px);
+}
+
+.no-current-appointment {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.no-current-appointment .browse-services-btn {
+  background-color: #3f8f95;
+  color: white;
+  font-weight: 600;
+}
+
+.status-badge.confirmed {
+  background-color: #E8F5E9;
+  color: var(--success-green);
+}
+
+.status-badge.serving {
+  background-color: #FFF3E0;
+  color: #E65100;
 }

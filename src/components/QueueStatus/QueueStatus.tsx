@@ -1,123 +1,257 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { FiRefreshCcw } from 'react-icons/fi'
-import { useAppointments } from '../../contexts/AppointmentsContext'
+import { FaCalendarAlt, FaClock, FaTimes } from 'react-icons/fa'
+import {
+  useAppointments, Appointment, isActiveAppointment, isCancellable, displayStatus,
+} from '../../contexts/AppointmentsContext'
+import { useToast } from '../../contexts/ToastContext'
+import { getQueueStatus, QueueStatusData } from '../../api/routes'
+import { formatDisplayDate, formatDisplayTime, formatMinutes, toLocalDateString } from '../../utils/date'
 import './QueueStatus.css'
 
-interface QueueAppointment {
-  id: number
-  service: string
-  date: string
-  status: 'pending' | 'confirmed' | 'serving' | 'completed'
-}
-
 interface QueueStatusProps {
-  onViewPastAppointment: (appointment: QueueAppointment) => void
+  onViewPastAppointment: (appointment: Appointment) => void
+  onBookNew: () => void
 }
 
-function QueueStatus({ onViewPastAppointment }: QueueStatusProps) {
-  const { appointments, loading, fetchUserAppointments } = useAppointments()
+const POLL_MS = 15000 // refresh the live queue every 15 seconds
 
-  useEffect(() => {
+const bySchedule = (a: Appointment, b: Appointment) =>
+  `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`)
+
+const STATUS_LABEL: Record<string, string> = {
+  Pending: '⊙ Pending',
+  Confirmed: '✓ Confirmed',
+  Serving: '▶ Serving',
+  Completed: '✓ Completed',
+  Cancelled: '✕ Cancelled',
+  Missed: '! Missed',
+}
+
+function QueueStatus({ onViewPastAppointment, onBookNew }: QueueStatusProps) {
+  const { appointments, fetchUserAppointments, cancelAppointment } = useAppointments()
+  const { showToast } = useToast()
+  const [queueInfo, setQueueInfo] = useState<Record<number, QueueStatusData>>({})
+  const [firstLoad, setFirstLoad] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [cancellingId, setCancellingId] = useState<number | null>(null)
+  const previousStatus = useRef<Record<number, string>>({})
+
+  const refresh = useCallback(async (silent: boolean) => {
     const user = JSON.parse(localStorage.getItem('user') || '{}')
-    if (user?.id) fetchUserAppointments(String(user.id))
+    if (!user?.id) return
+    if (!silent) setRefreshing(true)
+    try {
+      const token = localStorage.getItem('token') || ''
+      const [, queueRes] = await Promise.all([
+        fetchUserAppointments(String(user.id), { silent: true }),
+        getQueueStatus(token),
+      ])
+      if (queueRes.success) {
+        const map: Record<number, QueueStatusData> = {}
+        queueRes.data.forEach(q => { map[q.appointment_id] = q })
+        setQueueInfo(map)
+      }
+      setLastUpdated(new Date())
+    } catch {
+      if (!silent) showToast('Could not refresh the queue. Check your connection.', 'error')
+    } finally {
+      setRefreshing(false)
+      setFirstLoad(false)
+    }
+  }, [fetchUserAppointments, showToast])
+
+  // Initial load + polling; pause while the browser tab is hidden
+  useEffect(() => {
+    refresh(true)
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') refresh(true)
+    }, POLL_MS)
+    return () => clearInterval(timer)
   }, [])
 
-  const handleRefresh = () => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}')
-    if (user?.id) fetchUserAppointments(String(user.id))
-  }
+  // Notify the user when one of their appointments starts being served
+  useEffect(() => {
+    appointments.forEach(a => {
+      const before = previousStatus.current[a.id]
+      if (before && before !== 'Serving' && a.status === 'Serving') {
+        showToast(`It's your turn! ${a.service} is now serving you.`, 'info')
+      }
+      previousStatus.current[a.id] = a.status
+    })
+  }, [appointments, showToast])
 
-  const activeAppointments: QueueAppointment[] = appointments
-    .filter(a => a.status !== 'Completed')
-    .map(a => ({
-      id: a.id,
-      service: a.service,
-      date: a.date,
-      status: a.status.toLowerCase() as 'pending' | 'confirmed' | 'serving' | 'completed'
-    }))
-
-  const pastAppointments: QueueAppointment[] = appointments
-    .filter(a => a.status === 'Completed')
-    .map(a => ({
-      id: a.id,
-      service: a.service,
-      date: a.date,
-      status: 'completed' as const
-    }))
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending':    return '⊙ Pending'
-      case 'confirmed':  return '✓ Confirmed'
-      case 'serving':    return '▶ Serving'
-      case 'completed':  return '✓ Completed'
-      default:           return status
+  const handleCancel = async (apt: Appointment) => {
+    const when = `${formatDisplayDate(apt.date)} at ${formatDisplayTime(apt.time)}`
+    if (!window.confirm(`Cancel your ${apt.service} appointment on ${when}?`)) return
+    setCancellingId(apt.id)
+    const res = await cancelAppointment(apt.id)
+    setCancellingId(null)
+    if (res.success) {
+      showToast('Appointment cancelled', 'success')
+      refresh(true)
+    } else {
+      showToast(res.message || 'Failed to cancel appointment', 'error')
     }
   }
 
-  if (loading) return <div style={{ padding: '2rem' }}>Loading...</div>
+  const active = appointments.filter(isActiveAppointment).sort(bySchedule)
+  const past = appointments.filter(a => !isActiveAppointment(a)).sort(bySchedule).reverse()
+  const current = active[0]
+  const others = active.slice(1)
+  const today = toLocalDateString(new Date())
+
+  if (firstLoad) {
+    return (
+      <div className="queue-status">
+        <div className="queue-content">
+          <div className="skeleton" style={{ height: 280, marginBottom: 30 }} />
+          <div className="skeleton" style={{ height: 120 }} />
+        </div>
+      </div>
+    )
+  }
+
+  const renderCurrent = (apt: Appointment) => {
+    const info = queueInfo[apt.id]
+    const isServing = apt.status === 'Serving'
+    const isFutureDay = apt.date > today
+    const ahead = info?.people_ahead ?? 0
+    const waitMinutes = ahead * (info?.duration ?? 0)
+    // Progress: how many of the people before you are already done
+    const before = Math.max(apt.queueNumber - 1, 0)
+    const progress = isServing ? 100 : before === 0 ? 0 : Math.round(((before - ahead) / before) * 100)
+
+    return (
+      <div className={`appointment-item current ${isServing ? 'is-serving' : ''}`}>
+        {isServing && (
+          <div className="your-turn-banner">▶ It's your turn! Please proceed to the counter.</div>
+        )}
+        <div className="current-top">
+          <div className="appointment-info">
+            <strong>{apt.service}</strong>
+            <span><FaCalendarAlt /> {formatDisplayDate(apt.date)}</span>
+            <span><FaClock /> {formatDisplayTime(apt.time)}</span>
+          </div>
+          <div className={`status-badge ${apt.status.toLowerCase()}`}>
+            {STATUS_LABEL[apt.status] ?? apt.status}
+          </div>
+        </div>
+
+        <div className="queue-info-grid">
+          <div className="queue-info-box highlight">
+            <div className="info-label">Your Number</div>
+            <div className="info-value">#{apt.queueNumber}</div>
+          </div>
+          <div className="queue-info-box">
+            <div className="info-label">Now Serving</div>
+            <div className="info-value">{info?.now_serving ? `#${info.now_serving}` : '—'}</div>
+          </div>
+          <div className="queue-info-box">
+            <div className="info-label">People Ahead</div>
+            <div className="info-value">{isServing ? 0 : ahead}</div>
+          </div>
+          <div className="queue-info-box">
+            <div className="info-label">Estimated Wait</div>
+            <div className="info-value small">
+              {isServing ? 'Now' : isFutureDay ? formatDisplayDate(apt.date) : formatMinutes(waitMinutes)}
+            </div>
+          </div>
+        </div>
+
+        <div className="progress-section">
+          <div className="progress-label">Queue progress</div>
+          <div className="progress-bar">
+            <div className="progress-fill" style={{ width: `${progress}%` }} />
+          </div>
+          <div className="progress-info">
+            <span>{isServing ? 'Being served' : `${ahead} ahead of you`}</span>
+            <span>{progress}%</span>
+          </div>
+        </div>
+
+        {isCancellable(apt) && (
+          <div className="current-actions">
+            <button
+              className="cancel-appointment-btn"
+              onClick={() => handleCancel(apt)}
+              disabled={cancellingId === apt.id}
+            >
+              <FaTimes /> {cancellingId === apt.id ? 'Cancelling…' : 'Cancel Appointment'}
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="queue-status">
       <header className="queue-header">
         <div>
           <h1>Queue Status</h1>
-          <p>Track your appointment progress</p>
+          <p className="live-line">
+            <span className="live-dot" /> Live · updates every 15 seconds
+            {lastUpdated && <> · last updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}</>}
+          </p>
         </div>
-        <button className="refresh-btn" onClick={handleRefresh}>
-          <FiRefreshCcw className="refresh-icon" />
-          Refresh
+        <button className="refresh-btn" onClick={() => refresh(false)} disabled={refreshing}>
+          <FiRefreshCcw className={`refresh-icon ${refreshing ? 'spinning' : ''}`} />
+          {refreshing ? 'Refreshing…' : 'Refresh'}
         </button>
       </header>
 
       <div className="queue-content">
-        {/* Current/top active appointment */}
         <div className="current-appointment">
-          {activeAppointments.length > 0 ? (
-            <div className="appointment-item current">
-              <div className="appointment-info">
-                <strong>{activeAppointments[0].service}</strong>
-                <span>{activeAppointments[0].date}</span>
-              </div>
-              <div className={`status-badge ${activeAppointments[0].status}`}>
-                {getStatusBadge(activeAppointments[0].status)}
-              </div>
+          {current ? renderCurrent(current) : (
+            <div className="no-current-appointment">
+              <p>No active appointment</p>
+              <button className="browse-services-btn" onClick={onBookNew}>Book an Appointment</button>
             </div>
-          ) : (
-            <div className="no-current-appointment">No active appointment</div>
           )}
         </div>
 
-        {/* All active appointments */}
-        <div className="active-appointments">
-          <h2>Active Appointments</h2>
-          <div className="appointments-list">
-            {activeAppointments.length === 0 ? (
-              <div className="no-appointments">No active appointments</div>
-            ) : (
-              activeAppointments.map(apt => (
+        {others.length > 0 && (
+          <div className="active-appointments">
+            <h2>Other Active Appointments</h2>
+            <div className="appointments-list stagger">
+              {others.map(apt => (
                 <div key={apt.id} className="appointment-item">
                   <div className="appointment-info">
-                    <strong>{apt.service}</strong>
-                    <span>{apt.date}</span>
+                    <strong>{apt.service} · #{apt.queueNumber}</strong>
+                    <span>{formatDisplayDate(apt.date)} · {formatDisplayTime(apt.time)}</span>
+                    {queueInfo[apt.id] && (
+                      <span>{queueInfo[apt.id].people_ahead} ahead of you</span>
+                    )}
                   </div>
-                  <div className={`status-badge ${apt.status}`}>
-                    {getStatusBadge(apt.status)}
+                  <div className="item-side">
+                    <div className={`status-badge ${apt.status.toLowerCase()}`}>
+                      {STATUS_LABEL[apt.status] ?? apt.status}
+                    </div>
+                    {isCancellable(apt) && (
+                      <button
+                        className="cancel-link"
+                        onClick={() => handleCancel(apt)}
+                        disabled={cancellingId === apt.id}
+                      >
+                        {cancellingId === apt.id ? 'Cancelling…' : 'Cancel'}
+                      </button>
+                    )}
                   </div>
                 </div>
-              ))
-            )}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Past appointments */}
         <div className="past-appointments">
           <h2>Past Appointments</h2>
-          <div className="appointments-list">
-            {pastAppointments.length === 0 ? (
+          <div className="appointments-list stagger">
+            {past.length === 0 ? (
               <div className="no-appointments">No past appointments</div>
             ) : (
-              pastAppointments.map(apt => (
+              past.map(apt => (
                 <button
                   key={apt.id}
                   className="appointment-item clickable"
@@ -125,10 +259,10 @@ function QueueStatus({ onViewPastAppointment }: QueueStatusProps) {
                 >
                   <div className="appointment-info">
                     <strong>{apt.service}</strong>
-                    <span>{apt.date}</span>
+                    <span>{formatDisplayDate(apt.date)} · {formatDisplayTime(apt.time)}</span>
                   </div>
-                  <div className="status-badge completed">
-                    ✓ Completed
+                  <div className={`status-badge ${displayStatus(apt).toLowerCase()}`}>
+                    {STATUS_LABEL[displayStatus(apt)] ?? displayStatus(apt)}
                   </div>
                 </button>
               ))

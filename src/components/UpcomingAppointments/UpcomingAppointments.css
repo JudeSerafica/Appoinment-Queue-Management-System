@@ -139,3 +139,55 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Card is a <button> so it is keyboard-accessible */
+.appointment-card {
+  background: white;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  width: 100%;
+}
+
+.appointment-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--primary-blue);
+}
+
+.appointment-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-queue-number {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--primary-blue);
+}
+
+.appointment-details h3 {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.appointment-details p {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--dark-gray);
+  margin-bottom: 4px;
+}
+
+@media (max-width: 1024px) {
+  .appointments-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .appointments-grid {
+    grid-template-columns: 1fr;
+  }
+}

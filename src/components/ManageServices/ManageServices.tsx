@@ -5,24 +5,37 @@ import AddServiceModal from '../AddServiceModal/AddServiceModal'
 import EditServiceModal from '../EditServiceModal/EditServiceModal'
 import './ManageServices.css'
 import { useServices, Service } from '../../contexts/ServicesContext'
+import { useToast } from '../../contexts/ToastContext'
 
 function ManageServices() {
-  const { services, addService, updateService, deleteService, toggleServiceStatus } = useServices()
+  const { services, refreshServices, updateService, deleteService } = useServices()
+  const { showToast } = useToast()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedService, setSelectedService] = useState<Service | null>(null)
 
-  const handleAddService = (newService: Omit<Service, 'id'>) => {
-    addService(newService)
+  const handleAddService = () => {
+    refreshServices()   // reload so the new service shows its real id and status
     setIsModalOpen(false)
   }
 
-  const handleDeleteService = (id: number) => {
-    deleteService(id)
+  const handleDeleteService = async (id: number) => {
+    const service = services.find(s => s.id === id)
+    if (!window.confirm(`Delete "${service?.name ?? 'this service'}"? It will no longer be available for booking.`)) return
+    const res = await deleteService(id)
+    if (res.success) showToast('Service deleted', 'success')
+    else showToast(`Failed to delete service: ${res.message}`, 'error')
   }
 
-  const handleToggleStatus = (id: number) => {
-    toggleServiceStatus(id)
+  // Save the new status to the server (updateService updates the list on success)
+  const handleToggleStatus = async (id: number) => {
+    const service = services.find(s => s.id === id)
+    if (!service) return
+    const success = await updateService({
+      ...service,
+      status: service.status === 'Active' ? 'Inactive' : 'Active',
+    })
+    if (!success) showToast('Failed to update service status. Please try again.', 'error')
   }
 
   const handleEditService = async (service: Service) => {
@@ -31,7 +44,7 @@ function ManageServices() {
         setIsEditModalOpen(false)
         setSelectedService(null)
       } else {
-        alert('Failed to update service. Please try again.')
+        showToast('Failed to update service. Please try again.', 'error')
       }
     }
   const openEditModal = (service: Service) => {

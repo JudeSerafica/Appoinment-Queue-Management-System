@@ -24,6 +24,34 @@
 
 .card-icon {
   font-size: 20px;
+  color: #2f6f73;
+}
+
+.overview-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.overview-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.overview-card.clickable {
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  width: 100%;
+}
+
+.card-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--dark-gray);
+}
+
+.overview-card.clickable .card-hint {
+  color: var(--primary-blue);
+  font-weight: 600;
 }
 
 .card-value {

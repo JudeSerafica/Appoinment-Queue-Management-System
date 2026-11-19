@@ -2,38 +2,27 @@ import { useState } from 'react'
 import './MyQueue.css'
 import QueueStatus from '../../components/QueueStatus/QueueStatus'
 import PastAppointmentsDetail from '../../components/PastAppointmentsDetail/PastAppointmentsDetail'
+import type { Appointment } from '../../contexts/AppointmentsContext'
 
-interface QueueAppointment {
-  id: number
-  service: string
-  date: string
-  status: 'pending' | 'confirmed' | 'serving' | 'completed'
+interface MyQueueProps {
+  onBookNew: () => void
 }
 
-function MyQueue() {
-  const [view, setView] = useState<'status' | 'pastDetail'>('status')
-  const [selectedAppointment, setSelectedAppointment] = useState<QueueAppointment | null>(null)
-
-  const handleViewPastAppointment = (appointment: QueueAppointment) => {
-    setSelectedAppointment(appointment)
-    setView('pastDetail')
-  }
-
-  const handleGoBack = () => {
-    setView('status')
-    setSelectedAppointment(null)
-  }
+function MyQueue({ onBookNew }: MyQueueProps) {
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
 
   return (
     <div className="my-queue">
-      {view === 'status' && (
-        <QueueStatus onViewPastAppointment={handleViewPastAppointment} />
-      )}
-      {view === 'pastDetail' && selectedAppointment && (
-        <PastAppointmentsDetail
-          appointment={selectedAppointment}
-          onGoBack={handleGoBack}
-        />
+      {selectedAppointment ? (
+        <div className="page-enter">
+          <PastAppointmentsDetail
+            appointment={selectedAppointment}
+            onGoBack={() => setSelectedAppointment(null)}
+            onBookAgain={onBookNew}
+          />
+        </div>
+      ) : (
+        <QueueStatus onViewPastAppointment={setSelectedAppointment} onBookNew={onBookNew} />
       )}
     </div>
   )

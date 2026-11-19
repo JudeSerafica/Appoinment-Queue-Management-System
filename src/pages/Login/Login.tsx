@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { login } from '../../api/routes'
 import './Login.css'
 
@@ -7,9 +7,26 @@ interface LoginProps {
   onLogin: (email: string, fullName?: string) => void
 }
 
+interface LoginLocationState {
+  message?: string
+  email?: string
+}
+
 function Login({ onLogin }: LoginProps) {
   const navigate = useNavigate()
-  const [email, setEmail] = useState('')
+  const location = useLocation()
+  const signupState = (location.state ?? {}) as LoginLocationState
+  // Set by the API layer when a saved login has expired
+  const [sessionExpired] = useState(() => {
+    try {
+      const flag = sessionStorage.getItem('sessionExpired') === '1'
+      sessionStorage.removeItem('sessionExpired')
+      return flag
+    } catch { return false }
+  })
+  const successMessage = signupState.message
+    ?? (sessionExpired ? 'Your session has expired. Please log in again.' : '')
+  const [email, setEmail] = useState(signupState.email ?? '')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')        // show errors to user
   const [loading, setLoading] = useState(false) // prevent double submit
@@ -64,6 +81,7 @@ function Login({ onLogin }: LoginProps) {
           <h2>Sign In</h2>
 
           {/* show error message */}
+          {successMessage && !error && <p style={{ color: 'green', marginBottom: '10px' }}>{successMessage}</p>}
           {error && <p style={{ color: 'red', marginBottom: '10px' }}>{error}</p>}
 
           <form onSubmit={handleLogin}>

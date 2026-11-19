@@ -125,6 +125,20 @@ async function request<T>(
   select: (data: unknown) => T,
 ): Promise<ApiResult<T>> {
   const response = await fetch(`${API_BASE}${path}`, init)
+
+  // Expired or invalid login: clear it and send the user back to sign in.
+  // (/auth/* returns 401 for wrong credentials, so it is excluded.)
+  if (response.status === 401 && !path.startsWith('/auth/') && localStorage.getItem('token')) {
+    let role = ''
+    try { role = JSON.parse(localStorage.getItem('user') || '{}').role ?? '' } catch { /* ignore */ }
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    localStorage.removeItem('isAdminLoggedIn')
+    try { sessionStorage.setItem('sessionExpired', '1') } catch { /* ignore */ }
+    window.location.assign(role === 'admin' ? '/admin' : '/login')
+    return { success: false, message: 'Your session has expired. Please log in again.' }
+  }
+
   let body: unknown
 
   try {
@@ -135,7 +149,13 @@ async function request<T>(
 
   const envelope = requiredRecord(body, 'API')
   if (!response.ok || envelope.success !== true) {
-    return { success: false, message: safeFailureMessage(response.status) }
+    // Show the server's validation message (4xx) when it gives one; hide 5xx details
+    const serverMessage = typeof envelope.message === 'string' ? envelope.message.trim() : ''
+    const useServerMessage = serverMessage !== '' && response.status >= 400 && response.status < 500
+    return {
+      success: false,
+      message: useServerMessage ? serverMessage : safeFailureMessage(response.status),
+    }
   }
 
   return {
@@ -283,6 +303,48 @@ export const getArchivedAppointments = (token: string) =>
     headers: authHeaders(token),
   }, value => recordList(value, selectAppointment))
 
+// User cancels their own pending/confirmed appointment
+export const cancelAppointment = (id: number, token: string) =>
+  request('/appointments/cancel', {
+    method: 'PUT',
+    headers: authenticatedJsonHeaders(token),
+    body: JSON.stringify({ id }),
+  }, noData)
+
+export interface QueueStatusData {
+  appointment_id: number
+  slot_id: number
+  queue_number: number
+  status: string
+  duration: number
+  now_serving: number | null   // null = nobody is being served yet in this slot
+  people_ahead: number
+}
+
+export const getQueueStatus = (token: string) =>
+  request('/appointments/queue', { headers: authHeaders(token) }, value =>
+    recordList(value, (record): QueueStatusData => ({
+      appointment_id: numberField(record, 'appointment_id'),
+      slot_id: numberField(record, 'slot_id'),
+      queue_number: numberField(record, 'queue_number'),
+      status: stringField(record, 'status'),
+      duration: numberField(record, 'duration'),
+      now_serving: record.now_serving === null || record.now_serving === undefined
+        ? null
+        : numberField(record, 'now_serving'),
+      people_ahead: numberField(record, 'people_ahead'),
+    })))
+
+export const changePassword = (
+  data: { current_password: string; new_password: string },
+  token: string,
+) =>
+  request('/users/password', {
+    method: 'PUT',
+    headers: authenticatedJsonHeaders(token),
+    body: JSON.stringify(data),
+  }, noData)
+
 // Services
 export const getServices = () =>
   request('/services', {}, value => recordList(value, selectService))
@@ -315,6 +377,13 @@ export const createSlot = (data: SlotCreate, token: string) =>
     headers: authenticatedJsonHeaders(token),
     body: JSON.stringify(data),
   }, value => ({ slot_id: selectId(value, 'slot_id') }))
+
+export const deleteService = (id: number, token: string) =>
+  request('/services', {
+    method: 'DELETE',
+    headers: authenticatedJsonHeaders(token),
+    body: JSON.stringify({ id }),
+  }, noData)
 
 export const deleteSlot = (id: number, token: string) =>
   request('/slots', {

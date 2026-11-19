@@ -26,10 +26,30 @@ function SelectTimeSlot({ service, onSelectTime, onGoBack }: SelectTimeSlotProps
 
   useEffect(() => { fetchSlots() }, [])
 
-  const serviceSlots = useMemo(
-    () => getSlotsByService(service.id),
-    [slots, service.id]
-  )
+  // Only slots that start in the future and still have room
+  const serviceSlots = useMemo(() => {
+    const now = new Date()
+    return getSlotsByService(service.id).filter(s =>
+      s.booked < s.capacity && new Date(`${s.date}T${s.time}`) > now)
+  }, [slots, service.id])
+
+  // Jump the calendar to the earliest date that has an open slot
+  const [autoPicked, setAutoPicked] = useState(false)
+  useEffect(() => {
+    if (autoPicked || serviceSlots.length === 0) return
+    const first = [...serviceSlots].sort((a, b) =>
+      `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))[0]
+    const [y, m, d] = first.date.split('-').map(Number)
+    setCurrentMonth(new Date(y, m - 1, 1))
+    setSelectedDate(d)
+    setAutoPicked(true)
+  }, [serviceSlots, autoPicked])
+
+  const clearSelection = () => {
+    setSelectedDate(null)
+    setSelectedTime(null)
+    setSelectedSlotId(null)
+  }
 
   const getDaysInMonth = (date: Date) =>
     new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
@@ -49,7 +69,7 @@ function SelectTimeSlot({ service, onSelectTime, onGoBack }: SelectTimeSlotProps
   const availableSlots = useMemo(() => {
     if (!selectedDate) return []
     return serviceSlots
-      .filter(s => s.date === toDateStr(selectedDate) && s.booked < s.capacity)
+      .filter(s => s.date === toDateStr(selectedDate))
       .sort((a, b) => a.time.localeCompare(b.time))
   }, [serviceSlots, selectedDate, currentMonth])
 
@@ -65,7 +85,7 @@ function SelectTimeSlot({ service, onSelectTime, onGoBack }: SelectTimeSlotProps
   }
 
   const hasSlots = (day: number) =>
-    serviceSlots.some(s => s.date === toDateStr(day) && s.booked < s.capacity)
+    serviceSlots.some(s => s.date === toDateStr(day))
 
   // Capacity fill level for colour coding
   const fillLevel = (slot: { capacity: number; booked: number }) => {
@@ -92,9 +112,16 @@ function SelectTimeSlot({ service, onSelectTime, onGoBack }: SelectTimeSlotProps
           <div className="section-label">Select Date</div>
           <div className="calendar">
             <div className="cal-header">
-              <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}>‹</button>
+              <button
+                onClick={() => { setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1)); clearSelection() }}
+                disabled={currentMonth.getFullYear() === today.getFullYear() && currentMonth.getMonth() <= today.getMonth()}
+                aria-label="Previous month"
+              >‹</button>
               <span>{monthName}</span>
-              <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}>›</button>
+              <button
+                onClick={() => { setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1)); clearSelection() }}
+                aria-label="Next month"
+              >›</button>
             </div>
             <div className="cal-weekdays">
               {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d}>{d}</div>)}
@@ -138,7 +165,11 @@ function SelectTimeSlot({ service, onSelectTime, onGoBack }: SelectTimeSlotProps
             {!selectedDate ? (
               <div className="empty-state">Select a date to see available slots</div>
             ) : availableSlots.length === 0 ? (
-              <div className="empty-state">No available slots for this date</div>
+              <div className="empty-state">
+                {serviceSlots.length === 0
+                  ? 'No open slots for this service yet. Please check back later.'
+                  : 'No available slots for this date. Dates with a dot have open slots.'}
+              </div>
             ) : (
               availableSlots.map(slot => {
                 const spotsLeft = slot.capacity - slot.booked

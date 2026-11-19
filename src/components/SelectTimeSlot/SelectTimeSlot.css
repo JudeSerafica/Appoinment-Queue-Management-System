@@ -288,3 +288,7 @@
   }
   .time-slot-header { padding: 16px 20px; }
 }
+.cal-header button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}

@@ -11,7 +11,14 @@ function AdminLogin({ onLogin }: AdminLoginProps) {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+  // Set by the API layer when a saved admin login has expired
+  const [error, setError] = useState(() => {
+    try {
+      const expired = sessionStorage.getItem('sessionExpired') === '1'
+      sessionStorage.removeItem('sessionExpired')
+      return expired ? 'Your session has expired. Please log in again.' : ''
+    } catch { return '' }
+  })
   const [loading, setLoading] = useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {

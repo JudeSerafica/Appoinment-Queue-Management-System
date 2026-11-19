@@ -5,10 +5,38 @@ import {
   updateAppointmentStatus,
   deleteAppointment as apiDeleteAppointment,
   getArchivedAppointments as apiGetArchived,
+  cancelAppointment as apiCancelAppointment,
   AppointmentData,
 } from '../api/routes'
+import { toLocalDateString } from '../utils/date'
 
-export type AppointmentStatus = 'Pending' | 'Confirmed' | 'Serving' | 'Completed'
+export type AppointmentStatus = 'Pending' | 'Confirmed' | 'Serving' | 'Completed' | 'Cancelled'
+
+// Appointments still waiting or in progress (not completed and not cancelled)
+export const ACTIVE_STATUSES: AppointmentStatus[] = ['Pending', 'Confirmed', 'Serving']
+
+type StatusAndDate = { status: AppointmentStatus; date: string }
+
+// Pending/confirmed but the date already passed = the user never got served
+export const isMissed = (a: StatusAndDate) =>
+  (a.status === 'Pending' || a.status === 'Confirmed') && a.date < toLocalDateString(new Date())
+
+// Still upcoming or in progress (a past-dated pending appointment is not active)
+export const isActiveAppointment = (a: StatusAndDate) =>
+  ACTIVE_STATUSES.includes(a.status) && !isMissed(a)
+
+// Only upcoming pending/confirmed appointments can be cancelled by the user
+export const isCancellable = (a: StatusAndDate) =>
+  (a.status === 'Pending' || a.status === 'Confirmed') && !isMissed(a)
+
+// Label shown to the user ("Missed" instead of a stale "Pending")
+export const displayStatus = (a: StatusAndDate): string =>
+  isMissed(a) ? 'Missed' : a.status
+
+export interface ActionResult {
+  success: boolean
+  message: string
+}
 
 export interface Appointment {
   id: number
@@ -27,16 +55,17 @@ interface AppointmentsContextType {
   archivedAppointments: Appointment[]
   loading: boolean
   addAppointment: (appointment: Omit<Appointment, 'id' | 'status'>) => void
-  updateStatus: (id: number, status: AppointmentStatus) => void
-  confirmAppointment: (id: number) => void
-  startAppointment: (id: number) => void
-  completeAppointment: (id: number) => void
-  deleteAppointment: (id: number) => void
+  updateStatus: (id: number, status: AppointmentStatus) => Promise<ActionResult>
+  confirmAppointment: (id: number) => Promise<ActionResult>
+  startAppointment: (id: number) => Promise<ActionResult>
+  completeAppointment: (id: number) => Promise<ActionResult>
+  deleteAppointment: (id: number) => Promise<ActionResult>
   filterByStatus: (status: AppointmentStatus | 'All') => Appointment[]
   searchAppointments: (query: string) => Appointment[]
-  fetchUserAppointments: (userId: string) => void
-  fetchAdminAppointments: () => void
-  fetchArchivedAppointments: () => void
+  fetchUserAppointments: (userId: string, options?: { silent?: boolean }) => Promise<void>
+  cancelAppointment: (id: number) => Promise<{ success: boolean; message: string }>
+  fetchAdminAppointments: (options?: { silent?: boolean }) => Promise<void>
+  fetchArchivedAppointments: (options?: { silent?: boolean }) => Promise<void>
 }
 
 const AppointmentsContext = createContext<AppointmentsContextType | undefined>(undefined)
@@ -49,8 +78,9 @@ export function AppointmentsProvider({ children }: { children: ReactNode }) {
   const [archivedAppointments, setArchivedAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(false)
 
-  const fetchUserAppointments = async (userId: string) => {
-    setLoading(true)
+  // silent: refresh in the background (polling) without showing the loading state
+  const fetchUserAppointments = async (userId: string, options: { silent?: boolean } = {}) => {
+    if (!options.silent) setLoading(true)
     try {
       const token = localStorage.getItem('token') || ''
       const res = await getAppointmentsByUser(userId, token)
@@ -71,12 +101,27 @@ export function AppointmentsProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Failed to fetch appointments:', err)
     } finally {
-      setLoading(false)
+      if (!options.silent) setLoading(false)
     }
   }
 
-  const fetchAdminAppointments = async () => {
-    setLoading(true)
+  const cancelAppointment = async (id: number) => {
+    try {
+      const token = localStorage.getItem('token') || ''
+      const res = await apiCancelAppointment(id, token)
+      if (res.success) {
+        setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'Cancelled' } : a))
+        return { success: true, message: 'Appointment cancelled' }
+      }
+      return { success: false, message: res.message }
+    } catch {
+      return { success: false, message: 'Cannot connect to server' }
+    }
+  }
+
+  // silent: background refresh (auto-refresh) without the loading state
+  const fetchAdminAppointments = async (options: { silent?: boolean } = {}) => {
+    if (!options.silent) setLoading(true)
     try {
       const token = localStorage.getItem('token') || ''
       const res = await getAdminAppointments(token)
@@ -89,6 +134,7 @@ export function AppointmentsProvider({ children }: { children: ReactNode }) {
           service: a.service_name,
           date: a.appointment_date,
           time: a.appointment_time,
+          estimatedEnd: a.estimated_end || undefined,
           status: capitalize(a.status) as AppointmentStatus,
         }))
         setAppointments(mapped)
@@ -96,12 +142,12 @@ export function AppointmentsProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Failed to fetch admin appointments:', err)
     } finally {
-      setLoading(false)
+      if (!options.silent) setLoading(false)
     }
   }
 
-  const fetchArchivedAppointments = async () => {
-    setLoading(true)
+  const fetchArchivedAppointments = async (options: { silent?: boolean } = {}) => {
+    if (!options.silent) setLoading(true)
     try {
       const token = localStorage.getItem('token') || ''
       const res = await apiGetArchived(token)
@@ -121,7 +167,7 @@ export function AppointmentsProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Failed to fetch archived appointments:', err)
     } finally {
-      setLoading(false)
+      if (!options.silent) setLoading(false)
     }
   }
 
@@ -129,7 +175,7 @@ export function AppointmentsProvider({ children }: { children: ReactNode }) {
     setAppointments(prev => [{ ...appointment, id: Date.now(), status: 'Pending' }, ...prev])
   }
 
-  const updateStatus = async (id: number, status: AppointmentStatus) => {
+  const updateStatus = async (id: number, status: AppointmentStatus): Promise<ActionResult> => {
     try {
       const token = localStorage.getItem('token') || ''
       const res = await updateAppointmentStatus(id, status.toLowerCase(), token)
@@ -137,16 +183,16 @@ export function AppointmentsProvider({ children }: { children: ReactNode }) {
         setAppointments(prev =>
           prev.map(app => app.id === id ? { ...app, status } : app)
         )
-      } else {
-        console.error('Status update failed:', res.message)
+        return { success: true, message: '' }
       }
-    } catch (err) {
-      console.error('Cannot connect to server:', err)
+      return { success: false, message: res.message }
+    } catch {
+      return { success: false, message: 'Cannot connect to server' }
     }
   }
 
   // Soft delete — removes from active list, moves to archived
-  const deleteAppointment = async (id: number) => {
+  const deleteAppointment = async (id: number): Promise<ActionResult> => {
     try {
       const token = localStorage.getItem('token') || ''
       const res = await apiDeleteAppointment(id, token)
@@ -156,11 +202,11 @@ export function AppointmentsProvider({ children }: { children: ReactNode }) {
           setAppointments(prev => prev.filter(a => a.id !== id))
           setArchivedAppointments(prev => [deleted, ...prev])
         }
-      } else {
-        console.error('Delete failed:', res.message)
+        return { success: true, message: '' }
       }
-    } catch (err) {
-      console.error('Cannot connect to server:', err)
+      return { success: false, message: res.message }
+    } catch {
+      return { success: false, message: 'Cannot connect to server' }
     }
   }
 
@@ -187,7 +233,7 @@ export function AppointmentsProvider({ children }: { children: ReactNode }) {
       confirmAppointment, startAppointment,
       completeAppointment, deleteAppointment,
       filterByStatus, searchAppointments,
-      fetchUserAppointments, fetchAdminAppointments,
+      fetchUserAppointments, fetchAdminAppointments, cancelAppointment,
       fetchArchivedAppointments,
     }}>
       {children}

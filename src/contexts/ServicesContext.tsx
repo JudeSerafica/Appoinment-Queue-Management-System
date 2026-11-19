@@ -1,5 +1,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getServices, ServiceData, updateService as apiUpdateService } from '../api/routes';
+import {
+  getServices, ServiceData,
+  updateService as apiUpdateService,
+  deleteService as apiDeleteService,
+} from '../api/routes';
 
 export interface Service {
   id: number;
@@ -15,7 +19,7 @@ interface ServicesContextType {
   loading: boolean;
   addService: (service: Omit<Service, 'id'>) => void;
   updateService: (service: Service) => Promise<boolean>;
-  deleteService: (id: number) => void;
+  deleteService: (id: number) => Promise<{ success: boolean; message: string }>;
   toggleServiceStatus: (id: number) => void;
   getActiveServices: () => Service[];
   refreshServices: () => void;
@@ -85,8 +89,20 @@ export function ServicesProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const deleteService = (id: number) => {
-    setServices(services.filter(s => s.id !== id));
+  // Calls DELETE /services; removes from the list only if the server succeeded
+  const deleteService = async (id: number): Promise<{ success: boolean; message: string }> => {
+    try {
+      const token = localStorage.getItem('token') || ''
+      const res = await apiDeleteService(id, token)
+      if (res.success) {
+        setServices(prev => prev.filter(s => s.id !== id))
+        return { success: true, message: '' }
+      }
+      return { success: false, message: res.message }
+    } catch (err) {
+      console.error('Cannot connect to server:', err)
+      return { success: false, message: 'Cannot connect to server' }
+    }
   };
 
   const toggleServiceStatus = (id: number) => {

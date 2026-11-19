@@ -59,6 +59,10 @@
   }
 
   .admin-main {
-    padding: 20px;
+    padding: 16px;
+  }
+
+  .admin-header {
+    padding: 20px 16px;
   }
 }

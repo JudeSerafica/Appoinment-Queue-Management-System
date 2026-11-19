@@ -60,12 +60,13 @@ export function SlotsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const addSlot = (newSlot: Omit<TimeSlot, 'id' | 'booked'>) => {
-    const slot: TimeSlot = {
+    // Use `prev` (not `slots`) so several adds in a row get unique temporary ids.
+    // Real ids replace these when fetchSlots() runs after generation.
+    setSlots(prev => [...prev, {
       ...newSlot,
-      id: slots.length > 0 ? Math.max(...slots.map(s => s.id)) + 1 : 1,
+      id: prev.length > 0 ? Math.max(...prev.map(s => s.id)) + 1 : 1,
       booked: 0,
-    }
-    setSlots(prev => [...prev, slot])
+    }])
   }
 
   const updateSlot = (updatedSlot: TimeSlot) => {

@@ -75,3 +75,33 @@
     padding: 20px;
   }
 }
+
+.appointment-detail-card p {
+  margin-bottom: 10px;
+}
+
+.detail-actions {
+  margin-top: 20px;
+}
+
+.book-again-btn {
+  background-color: #3f8f95;
+  color: white;
+  font-weight: 600;
+}
+
+.book-again-btn:hover {
+  background-color: #2f6f73;
+}
+
+.status-badge.completed {
+  background-color: #E8F5E9;
+  color: var(--success-green);
+}
+
+.detail-note {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--dark-gray);
+  font-style: italic;
+}

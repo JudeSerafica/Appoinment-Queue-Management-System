@@ -180,3 +180,31 @@
     padding: 20px;
   }
 }
+
+.service-description {
+  font-size: 13px;
+  color: var(--dark-gray);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.service-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.service-card:hover {
+  transform: translateY(-3px);
+}
+
+.clear-search-btn {
+  margin-top: 12px;
+  background: white;
+  color: #3f8f95;
+  border: 1px solid #3f8f95;
+  padding: 8px 18px;
+}
+
+.clear-search-btn:hover {
+  background: #3f8f95;
+  color: white;
+}

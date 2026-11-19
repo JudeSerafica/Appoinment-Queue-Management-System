@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import './AddServiceModal.css'
-import { createService } from '../../api/routes'
+import { createService, updateService } from '../../api/routes'
 
 interface AddServiceModalProps {
   onClose: () => void
-  onAddService: (service: { name: string; duration: number; status: 'Active' | 'Inactive' }) => void
+  onAddService: () => void   // parent reloads the list from the server
 }
 
 
@@ -22,20 +22,37 @@ function AddServiceModal({ onClose, onAddService }: AddServiceModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.name.trim()) return
     setError('')
+    if (!formData.name.trim()) {
+      setError('Service name is required')
+      return
+    }
+    if (!Number.isInteger(formData.duration) || formData.duration < 5 || formData.duration > 480) {
+      setError('Duration must be a whole number from 5 to 480 minutes')
+      return
+    }
     setLoading(true)
 
     try {
       const token = localStorage.getItem('token') || ''
       const res = await createService({
-        name: formData.name,
-        description: formData.description,
+        name: formData.name.trim(),
+        description: formData.description.trim(),
         duration: formData.duration,
       }, token)
 
       if (res.success) {
-        onAddService({ name: formData.name, duration: formData.duration, status: formData.status })
+        // New services are created active; apply "Inactive" if it was chosen
+        if (formData.status === 'Inactive') {
+          await updateService({
+            id: res.data.service_id,
+            name: formData.name.trim(),
+            description: formData.description.trim(),
+            duration: formData.duration,
+            is_active: 0,
+          }, token)
+        }
+        onAddService()
         onClose()
       } else {
         setError(res.message || 'Failed to create service')

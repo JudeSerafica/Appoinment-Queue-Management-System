@@ -5,35 +5,38 @@ interface AppointmentOverviewProps {
   upcoming: number
   completed: number
   queuePosition: number | string
+  onViewQueue?: () => void
 }
 
-
-function AppointmentOverview({ upcoming, completed, queuePosition }: AppointmentOverviewProps) {
+function AppointmentOverview({ upcoming, completed, queuePosition, onViewQueue }: AppointmentOverviewProps) {
   return (
-    <div className="appointment-overview">
+    <div className="appointment-overview stagger">
       <div className="overview-card">
         <div className="card-header">
           <span>Upcoming</span>
-          <FaCalendarAlt className="card-icon" style={{ color: '#2f6f73' }} />
+          <FaCalendarAlt className="card-icon" />
         </div>
         <div className="card-value">{upcoming}</div>
+        <div className="card-hint">Pending, confirmed or serving</div>
       </div>
 
       <div className="overview-card">
         <div className="card-header">
           <span>Completed</span>
-          <FaCheckCircle className="card-icon" style={{ color: '#2f6f73' }}/>
+          <FaCheckCircle className="card-icon" />
         </div>
         <div className="card-value">{completed}</div>
+        <div className="card-hint">Finished appointments</div>
       </div>
 
-      <div className="overview-card">
+      <button className="overview-card clickable" onClick={onViewQueue} disabled={!onViewQueue}>
         <div className="card-header">
-          <span>Queue Position</span>
-          <FaUsers className="card-icon" style={{ color: '#2f6f73' }}/>
+          <span>Next Queue Number</span>
+          <FaUsers className="card-icon" />
         </div>
         <div className="card-value">{queuePosition}</div>
-      </div>
+        <div className="card-hint">View live queue →</div>
+      </button>
     </div>
   )
 }

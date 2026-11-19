@@ -1,13 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { login, register } from '../../api/routes'
+import { register } from '../../api/routes'
 import './Signup.css'
 
-interface SignupProps {
-  onSignup: (email: string, fullName: string) => void
-}
-
-function Signup({ onSignup }: SignupProps) {
+function Signup() {
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -51,19 +47,11 @@ function Signup({ onSignup }: SignupProps) {
         return
       }
 
-      const session = await login({ email, password })
-      if (session.success) {
-        localStorage.setItem('token', session.data.token)
-        localStorage.setItem('user', JSON.stringify({
-          id: session.data.user.id,
-          name: session.data.user.name,
-          role: session.data.user.role,
-        }))
-        onSignup(email, session.data.user.name)
-        navigate('/dashboard')
-      } else {
-        setError('Account created. Please sign in to continue.')
-      }
+      // Huwag i-auto login: kailangan munang mag-login ng user
+      navigate('/login', {
+        replace: true,
+        state: { message: 'Account created successfully. Please log in to continue.', email },
+      })
     } catch (err) {
       setError('Cannot connect to server')
     } finally {
@@ -92,7 +80,7 @@ function Signup({ onSignup }: SignupProps) {
                 placeholder="Full Name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                pattern="[A-Za-z\s.'-]+"
+                pattern="[A-Za-z\s.'\-]+"
                 title="Name must contain letters only"
                 required
               />

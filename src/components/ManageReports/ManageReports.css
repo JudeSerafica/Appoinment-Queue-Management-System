@@ -154,3 +154,46 @@
     padding: 16px;
   }
 }
+
+/* ── Date range toolbar ───────────────────────────── */
+.reports-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: var(--dark-gray);
+}
+
+.range-buttons {
+  display: inline-flex;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.range-btn {
+  background: none;
+  border-radius: 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--dark-gray);
+}
+
+.range-btn + .range-btn {
+  border-left: 1px solid var(--border-color);
+}
+
+.range-btn.active {
+  background: #3f8f95;
+  color: white;
+}
+
+.stat-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--dark-gray);
+}

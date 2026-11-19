@@ -3,6 +3,50 @@
   padding: 20px;
   height: 100vh;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+  color: white;
+  min-width: 0;
+}
+
+.sidebar-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--primary-blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.sidebar-user-name {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logout-item:hover {
+  background-color: rgba(229, 57, 53, 0.18);
+  color: #ffb4b0;
 }
 
 .sidebar-header {
@@ -44,6 +88,11 @@
 .nav-item.active {
   background-color: #3f8f95 !important;
   color: white !important;
+  box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.7);
+}
+
+.nav-item:active {
+  transform: scale(0.98);
 }
 
 .nav-icon {
@@ -70,5 +119,37 @@
 
   .nav-icon {
     font-size: 16px;
+  }
+
+  /* Phone: stack icon over label so 5 buttons fit in one row */
+  .sidebar {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sidebar-header,
+  .sidebar-user {
+    display: none;
+  }
+
+  .sidebar-nav {
+    flex: 1;
+  }
+
+  .nav-item {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .nav-item.active {
+    box-shadow: none;
+  }
+
+  .sidebar-footer {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
   }
 }
