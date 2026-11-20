@@ -3,6 +3,7 @@ import { FaEye, FaEyeSlash } from 'react-icons/fa'
 import './Profile.css'
 import { getProfile, updateProfile, changePassword } from '../../api/routes'
 import { useToast } from '../../contexts/ToastContext'
+import { passwordProblem, PASSWORD_HINT } from '../../utils/password'
 
 interface ProfileProps {
   onNameChange: (name: string) => void
@@ -33,8 +34,7 @@ function Profile({ onNameChange }: ProfileProps) {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const token = localStorage.getItem('token') || ''
-        const res = await getProfile(token)
+        const res = await getProfile()
         if (res.success) {
           setName(res.data.name)
           setEmail(res.data.email)
@@ -69,8 +69,7 @@ function Profile({ onNameChange }: ProfileProps) {
 
     setSaving(true)
     try {
-      const token = localStorage.getItem('token') || ''
-      const res = await updateProfile({ name: trimmedName, phone: cleanedPhone }, token)
+      const res = await updateProfile({ name: trimmedName, phone: cleanedPhone })
       if (res.success) {
         setName(trimmedName)
         setEditedName(trimmedName)
@@ -91,14 +90,14 @@ function Profile({ onNameChange }: ProfileProps) {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
     setPasswordError('')
-    if (newPassword.length < 6) return setPasswordError('New password must be at least 6 characters long')
+    const problem = passwordProblem(newPassword)
+    if (problem) return setPasswordError('New p' + problem.slice(1))
     if (newPassword !== confirmPassword) return setPasswordError('New passwords do not match')
     if (newPassword === currentPassword) return setPasswordError('New password must be different from the current one')
 
     setChangingPassword(true)
     try {
-      const token = localStorage.getItem('token') || ''
-      const res = await changePassword({ current_password: currentPassword, new_password: newPassword }, token)
+      const res = await changePassword({ current_password: currentPassword, new_password: newPassword })
       if (res.success) {
         setCurrentPassword('')
         setNewPassword('')
@@ -204,7 +203,7 @@ function Profile({ onNameChange }: ProfileProps) {
             />
           </div>
           <div className="form-group">
-            <label htmlFor="new-password">New Password</label>
+            <label htmlFor="new-password" title={PASSWORD_HINT}>New Password <small>(min. 8, letter + number)</small></label>
             <input
               id="new-password"
               type={passwordType}

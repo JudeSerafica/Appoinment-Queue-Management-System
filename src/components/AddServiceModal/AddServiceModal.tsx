@@ -34,12 +34,11 @@ function AddServiceModal({ onClose, onAddService }: AddServiceModalProps) {
     setLoading(true)
 
     try {
-      const token = localStorage.getItem('token') || ''
       const res = await createService({
         name: formData.name.trim(),
         description: formData.description.trim(),
         duration: formData.duration,
-      }, token)
+      })
 
       if (res.success) {
         // New services are created active; apply "Inactive" if it was chosen
@@ -50,7 +49,7 @@ function AddServiceModal({ onClose, onAddService }: AddServiceModalProps) {
             description: formData.description.trim(),
             duration: formData.duration,
             is_active: 0,
-          }, token)
+          })
         }
         onAddService()
         onClose()

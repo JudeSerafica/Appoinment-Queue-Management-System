@@ -33,11 +33,10 @@ export function SlotsProvider({ children }: { children: ReactNode }) {
   const fetchSlots = useCallback(async () => {
     setLoading(true)
     try {
-      const token = localStorage.getItem('token') || ''
       const user = JSON.parse(localStorage.getItem('user') || '{}')
 
       const res = user.role === 'admin'
-        ? await getAdminSlots(token)
+        ? await getAdminSlots()
         : await getSlots()
 
       if (res.success) {
@@ -75,8 +74,7 @@ export function SlotsProvider({ children }: { children: ReactNode }) {
 
   const deleteSlot = async (id: number) => {
     try {
-      const token = localStorage.getItem('token') || ''
-      const res = await apiDeleteSlot(id, token)
+      const res = await apiDeleteSlot(id)
       if (res.success) {
         setSlots(prev => prev.filter(s => s.id !== id))
       } else {

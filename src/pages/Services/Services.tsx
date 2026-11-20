@@ -64,12 +64,11 @@ function Services({ onTrackQueue }: ServicesProps) {
     setBookingError('')
 
     try {
-      const token = localStorage.getItem('token') || ''
       const res = await createAppointment({
         service_id: bookingData.service.id,
         slot_id: bookingData.slotId,
         notes: '',
-      }, token)
+      })
 
       if (res.success) {
         setQueueNumber(res.data.queue_number)

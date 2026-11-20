@@ -6,10 +6,12 @@ import EditServiceModal from '../EditServiceModal/EditServiceModal'
 import './ManageServices.css'
 import { useServices, Service } from '../../contexts/ServicesContext'
 import { useToast } from '../../contexts/ToastContext'
+import { useConfirm } from '../../contexts/ConfirmContext'
 
 function ManageServices() {
   const { services, refreshServices, updateService, deleteService } = useServices()
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedService, setSelectedService] = useState<Service | null>(null)
@@ -21,7 +23,7 @@ function ManageServices() {
 
   const handleDeleteService = async (id: number) => {
     const service = services.find(s => s.id === id)
-    if (!window.confirm(`Delete "${service?.name ?? 'this service'}"? It will no longer be available for booking.`)) return
+    if (!await confirm(`Delete "${service?.name ?? 'this service'}"? It will no longer be available for booking.`, { title: 'Delete service', confirmText: 'Delete', danger: true })) return
     const res = await deleteService(id)
     if (res.success) showToast('Service deleted', 'success')
     else showToast(`Failed to delete service: ${res.message}`, 'error')

@@ -124,11 +124,20 @@ async function request<T>(
   init: RequestInit,
   select: (data: unknown) => T,
 ): Promise<ApiResult<T>> {
-  const response = await fetch(`${API_BASE}${path}`, init)
+  const headers = new Headers(init.headers)
+  // CSRF protection: the API rejects data-changing requests without this header,
+  // and other websites cannot add it to requests they send
+  headers.set('X-Requested-With', 'AQMS')
+  // ngrok's free plan shows a warning page instead of the API unless this header is sent.
+  if (API_BASE.includes('ngrok')) headers.set('ngrok-skip-browser-warning', 'true')
+
+  // The login token is an HttpOnly cookie set by the API. JavaScript never sees it;
+  // 'include' tells the browser to send it with every API request.
+  const response = await fetch(`${API_BASE}${path}`, { ...init, headers, credentials: 'include' })
 
   // Expired or invalid login: clear it and send the user back to sign in.
   // (/auth/* returns 401 for wrong credentials, so it is excluded.)
-  if (response.status === 401 && !path.startsWith('/auth/') && localStorage.getItem('token')) {
+  if (response.status === 401 && !path.startsWith('/auth/') && localStorage.getItem('user')) {
     let role = ''
     try { role = JSON.parse(localStorage.getItem('user') || '{}').role ?? '' } catch { /* ignore */ }
     localStorage.removeItem('token')
@@ -166,11 +175,6 @@ async function request<T>(
 }
 
 const jsonHeaders = { 'Content-Type': 'application/json' }
-const authHeaders = (token: string) => ({ Authorization: `Bearer ${token}` })
-const authenticatedJsonHeaders = (token: string) => ({
-  ...jsonHeaders,
-  ...authHeaders(token),
-})
 
 const selectUser = (value: unknown): AuthUser => {
   const user = requiredRecord(value, 'user')
@@ -236,13 +240,11 @@ export const login = (credentials: LoginCredentials) =>
     method: 'POST',
     headers: jsonHeaders,
     body: JSON.stringify(credentials),
-  }, value => {
-    const data = requiredRecord(value, 'login')
-    if (typeof data.token !== 'string' || data.token.length === 0) {
-      throw new Error('Invalid login response')
-    }
-    return { token: data.token, user: selectUser(data.user) }
-  })
+  }, value => ({ user: selectUser(requiredRecord(value, 'login').user) }))
+
+// Asks the API to delete the HttpOnly session cookie
+export const logout = () =>
+  request('/auth/logout', { method: 'POST' }, noData)
 
 export const register = (userData: RegisterData) =>
   request('/auth/register', {
@@ -252,26 +254,24 @@ export const register = (userData: RegisterData) =>
   }, noData)
 
 // User
-export const getProfile = (token: string) =>
-  request('/users/profile', { headers: authHeaders(token) }, selectProfile)
+export const getProfile = () =>
+  request('/users/profile', {}, selectProfile)
 
-export const updateProfile = (data: ProfileUpdate, token: string) =>
+export const updateProfile = (data: ProfileUpdate) =>
   request('/users/profile', {
     method: 'PUT',
-    headers: authenticatedJsonHeaders(token),
+    headers: jsonHeaders,
     body: JSON.stringify(data),
   }, selectProfile)
 
 // Appointments
-export const getAppointmentsByUser = (userId: string, token: string) =>
-  request(`/appointments/user/${encodeURIComponent(userId)}`, {
-    headers: authHeaders(token),
-  }, value => recordList(value, selectAppointment))
+export const getAppointmentsByUser = (userId: string) =>
+  request(`/appointments/user/${encodeURIComponent(userId)}`, {}, value => recordList(value, selectAppointment))
 
-export const createAppointment = (data: AppointmentCreate, token: string) =>
+export const createAppointment = (data: AppointmentCreate) =>
   request('/appointments', {
     method: 'POST',
-    headers: authenticatedJsonHeaders(token),
+    headers: jsonHeaders,
     body: JSON.stringify(data),
   }, value => {
     const record = requiredRecord(value, 'appointment')
@@ -284,30 +284,28 @@ export const createAppointment = (data: AppointmentCreate, token: string) =>
     }
   })
 
-export const updateAppointmentStatus = (id: number, status: string, token: string) =>
+export const updateAppointmentStatus = (id: number, status: string) =>
   request('/appointments', {
     method: 'PUT',
-    headers: authenticatedJsonHeaders(token),
+    headers: jsonHeaders,
     body: JSON.stringify({ id, status }),
   }, noData)
 
-export const deleteAppointment = (id: number, token: string) =>
+export const deleteAppointment = (id: number) =>
   request('/appointments', {
     method: 'DELETE',
-    headers: authenticatedJsonHeaders(token),
+    headers: jsonHeaders,
     body: JSON.stringify({ id }),
   }, noData)
 
-export const getArchivedAppointments = (token: string) =>
-  request('/appointments/archived', {
-    headers: authHeaders(token),
-  }, value => recordList(value, selectAppointment))
+export const getArchivedAppointments = () =>
+  request('/appointments/archived', {}, value => recordList(value, selectAppointment))
 
 // User cancels their own pending/confirmed appointment
-export const cancelAppointment = (id: number, token: string) =>
+export const cancelAppointment = (id: number) =>
   request('/appointments/cancel', {
     method: 'PUT',
-    headers: authenticatedJsonHeaders(token),
+    headers: jsonHeaders,
     body: JSON.stringify({ id }),
   }, noData)
 
@@ -321,8 +319,8 @@ export interface QueueStatusData {
   people_ahead: number
 }
 
-export const getQueueStatus = (token: string) =>
-  request('/appointments/queue', { headers: authHeaders(token) }, value =>
+export const getQueueStatus = () =>
+  request('/appointments/queue', {}, value =>
     recordList(value, (record): QueueStatusData => ({
       appointment_id: numberField(record, 'appointment_id'),
       slot_id: numberField(record, 'slot_id'),
@@ -337,11 +335,10 @@ export const getQueueStatus = (token: string) =>
 
 export const changePassword = (
   data: { current_password: string; new_password: string },
-  token: string,
 ) =>
   request('/users/password', {
     method: 'PUT',
-    headers: authenticatedJsonHeaders(token),
+    headers: jsonHeaders,
     body: JSON.stringify(data),
   }, noData)
 
@@ -349,17 +346,17 @@ export const changePassword = (
 export const getServices = () =>
   request('/services', {}, value => recordList(value, selectService))
 
-export const createService = (data: ServiceWrite, token: string) =>
+export const createService = (data: ServiceWrite) =>
   request('/services', {
     method: 'POST',
-    headers: authenticatedJsonHeaders(token),
+    headers: jsonHeaders,
     body: JSON.stringify(data),
   }, value => ({ service_id: selectId(value, 'service_id') }))
 
-export const updateService = (data: ServiceUpdate, token: string) =>
+export const updateService = (data: ServiceUpdate) =>
   request('/services', {
     method: 'PUT',
-    headers: authenticatedJsonHeaders(token),
+    headers: jsonHeaders,
     body: JSON.stringify(data),
   }, noData)
 
@@ -367,34 +364,34 @@ export const updateService = (data: ServiceUpdate, token: string) =>
 export const getSlots = () =>
   request('/slots', {}, value => recordList(value, selectSlot))
 
-export const getAdminSlots = (token: string) =>
-  request('/admin/slots', { headers: authHeaders(token) }, value =>
+export const getAdminSlots = () =>
+  request('/admin/slots', {}, value =>
     recordList(value, selectSlot))
 
-export const createSlot = (data: SlotCreate, token: string) =>
+export const createSlot = (data: SlotCreate) =>
   request('/slots', {
     method: 'POST',
-    headers: authenticatedJsonHeaders(token),
+    headers: jsonHeaders,
     body: JSON.stringify(data),
   }, value => ({ slot_id: selectId(value, 'slot_id') }))
 
-export const deleteService = (id: number, token: string) =>
+export const deleteService = (id: number) =>
   request('/services', {
     method: 'DELETE',
-    headers: authenticatedJsonHeaders(token),
+    headers: jsonHeaders,
     body: JSON.stringify({ id }),
   }, noData)
 
-export const deleteSlot = (id: number, token: string) =>
+export const deleteSlot = (id: number) =>
   request('/slots', {
     method: 'DELETE',
-    headers: authenticatedJsonHeaders(token),
+    headers: jsonHeaders,
     body: JSON.stringify({ id }),
   }, noData)
 
 // Admin
-export const getAdminAppointments = (token: string) =>
-  request('/admin/appointments', { headers: authHeaders(token) }, value =>
+export const getAdminAppointments = () =>
+  request('/admin/appointments', {}, value =>
     recordList(value, selectAppointment))
 
 // Reports expose only aggregate fields used by reporting screens.
@@ -416,17 +413,13 @@ const reportUrl = (path: string, from?: string, to?: string) => {
   return `${path}${query ? `?${query}` : ''}`
 }
 
-export const getWaitTimeReport = (token: string, from?: string, to?: string) =>
-  request(reportUrl('/reports/wait-time', from, to), {
-    headers: authHeaders(token),
-  }, value => selectReportRows(value, [
+export const getWaitTimeReport = (from?: string, to?: string) =>
+  request(reportUrl('/reports/wait-time', from, to), {}, value => selectReportRows(value, [
     'date', 'service_name', 'average_wait_time', 'avg_wait_time',
     'wait_time', 'total_appointments', 'appointment_count',
   ]))
 
-export const getServiceDemandReport = (token: string, from?: string, to?: string) =>
-  request(reportUrl('/reports/service-demand', from, to), {
-    headers: authHeaders(token),
-  }, value => selectReportRows(value, [
+export const getServiceDemandReport = (from?: string, to?: string) =>
+  request(reportUrl('/reports/service-demand', from, to), {}, value => selectReportRows(value, [
     'service_id', 'service_name', 'demand', 'total_appointments', 'appointment_count',
   ]))

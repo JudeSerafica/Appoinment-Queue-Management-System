@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { register } from '../../api/routes'
+import { passwordProblem, PASSWORD_HINT } from '../../utils/password'
 import './Signup.css'
 
 function Signup() {
@@ -27,9 +28,10 @@ function Signup() {
       return
     }
 
-    // 2. Password length check
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long')
+    // 2. Password strength check (8+ characters, a letter and a number)
+    const problem = passwordProblem(password)
+    if (problem) {
+      setError(problem)
       return
     }
 
@@ -97,10 +99,12 @@ function Signup() {
             <div className="form-group">
               <input
                 type="password"
-                placeholder="Password"
+                placeholder="Password (min. 8, letter + number)"
+                title={PASSWORD_HINT}
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                minLength={6}
+                minLength={8}
                 required
               />
             </div>
@@ -110,7 +114,8 @@ function Signup() {
                 placeholder="Confirm Password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                minLength={6}
+                autoComplete="new-password"
+                minLength={8}
                 required
               />
             </div>

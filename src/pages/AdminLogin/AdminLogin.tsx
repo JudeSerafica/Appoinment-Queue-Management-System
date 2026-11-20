@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { login } from '../../api/routes'
+import { login, logout } from '../../api/routes'
 import './AdminLogin.css'
 
 interface AdminLoginProps {
@@ -32,12 +32,14 @@ function AdminLogin({ onLogin }: AdminLoginProps) {
       if (res.success) {
         const userData = res.data.user  
         if (userData.role !== 'admin') {
+          await logout().catch(() => {})   // drop the session cookie the API just set
           setError('Access denied. Admin accounts only.')
           setLoading(false)
           return
         }
 
-        localStorage.setItem('token', res.data.token)
+        // The session token is stored by the browser as an HttpOnly cookie;
+        // only non-secret display info is kept here
         localStorage.setItem('user', JSON.stringify({
           id: userData.id,
           name: userData.name,

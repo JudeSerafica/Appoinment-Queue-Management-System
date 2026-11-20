@@ -2,6 +2,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import Sidebar from '../../components/Sidebar/Sidebar'
 import DashboardContent from '../../components/DashboardContent/DashboardContent'
 import './Dashboard.css'
+import { useConfirm } from '../../contexts/ConfirmContext'
 
 interface DashboardProps {
   onLogout: () => void
@@ -14,6 +15,7 @@ const TABS: DashboardTab[] = ['dashboard', 'services', 'queue', 'profile']
 
 function Dashboard({ onLogout, userFullName, onNameChange }: DashboardProps) {
   const navigate = useNavigate()
+  const confirm = useConfirm()
   const { tab } = useParams()
 
   // The active tab comes from the URL, so refresh and the Back button keep working
@@ -23,8 +25,8 @@ function Dashboard({ onLogout, userFullName, onNameChange }: DashboardProps) {
   const goTo = (page: DashboardTab) =>
     navigate(page === 'dashboard' ? '/dashboard' : `/dashboard/${page}`)
 
-  const handleLogout = () => {
-    if (!window.confirm('Are you sure you want to log out?')) return
+  const handleLogout = async () => {
+    if (!await confirm('Are you sure you want to log out?', { title: 'Log out', confirmText: 'Log out' })) return
     onLogout()
     navigate('/')
   }

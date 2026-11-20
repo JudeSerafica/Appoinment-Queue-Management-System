@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard/Dashboard'
 import AdminLogin from './pages/AdminLogin/AdminLogin'
 import AdminDashboard from './pages/AdminDashboard/AdminDashboard'
 import Signup from './pages/Signup/Signup'
+import { logout as apiLogout } from './api/routes'
 import './App.css'
 
 // Read initial state from localStorage so refresh doesn't log you out
@@ -22,12 +23,10 @@ function SignedOutLanding({ onEnter }: { onEnter: () => void }) {
 function App() {
   const storedUser = getStoredUser()
 
-  const [isUserLoggedIn, setIsUserLoggedIn] = useState(
-    !!localStorage.getItem('token') && storedUser.role === 'user'
-  )
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(
-    !!localStorage.getItem('token') && storedUser.role === 'admin'
-  )
+  // The real session is the HttpOnly cookie, checked by the API on every request.
+  // If it has expired, the first API call returns 401 and sends the user to log in.
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState(storedUser.role === 'user')
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(storedUser.role === 'admin')
   const [userFullName, setUserFullName] = useState(
     storedUser.name || ''
   )
@@ -38,11 +37,17 @@ function App() {
     setUserFullName(fullName || email.split('@')[0])
   }
 
+  // Ask the API to delete the session cookie (it cannot be removed from JavaScript)
+  const endServerSession = () => {
+    apiLogout().catch(() => { /* offline: the cookie still expires on its own */ })
+  }
+
   const handleUserLogout = () => {
     setIsUserLoggedIn(false)
     setUserFullName('')
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    endServerSession()
   }
 
   // Keep the greeting and stored user in sync after a profile name change
@@ -63,6 +68,7 @@ function App() {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('isAdminLoggedIn')
+    endServerSession()
   }
 
   // Clear any saved user or admin session (used when the landing page opens)

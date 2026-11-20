@@ -6,10 +6,12 @@ import { ServicesProvider } from './contexts/ServicesContext'
 import { SlotsProvider } from './contexts/SlotsContext'
 import { AppointmentsProvider } from './contexts/AppointmentsContext'
 import { ToastProvider } from './contexts/ToastContext'
+import { ConfirmProvider } from './contexts/ConfirmContext'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ToastProvider>
+    <ConfirmProvider>
     <ServicesProvider>
       <SlotsProvider>
         <AppointmentsProvider>
@@ -17,6 +19,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         </AppointmentsProvider>
       </SlotsProvider>
     </ServicesProvider>
+    </ConfirmProvider>
     </ToastProvider>
   </React.StrictMode>,
 )

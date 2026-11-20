@@ -82,8 +82,7 @@ export function AppointmentsProvider({ children }: { children: ReactNode }) {
   const fetchUserAppointments = async (userId: string, options: { silent?: boolean } = {}) => {
     if (!options.silent) setLoading(true)
     try {
-      const token = localStorage.getItem('token') || ''
-      const res = await getAppointmentsByUser(userId, token)
+      const res = await getAppointmentsByUser(userId)
       if (res.success) {
         const mapped = res.data.map((a: AppointmentData) => ({
           id: a.id,
@@ -107,8 +106,7 @@ export function AppointmentsProvider({ children }: { children: ReactNode }) {
 
   const cancelAppointment = async (id: number) => {
     try {
-      const token = localStorage.getItem('token') || ''
-      const res = await apiCancelAppointment(id, token)
+      const res = await apiCancelAppointment(id)
       if (res.success) {
         setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'Cancelled' } : a))
         return { success: true, message: 'Appointment cancelled' }
@@ -123,8 +121,7 @@ export function AppointmentsProvider({ children }: { children: ReactNode }) {
   const fetchAdminAppointments = async (options: { silent?: boolean } = {}) => {
     if (!options.silent) setLoading(true)
     try {
-      const token = localStorage.getItem('token') || ''
-      const res = await getAdminAppointments(token)
+      const res = await getAdminAppointments()
       if (res.success) {
         const mapped = res.data.map((a: AppointmentData) => ({
           id: a.id,
@@ -149,8 +146,7 @@ export function AppointmentsProvider({ children }: { children: ReactNode }) {
   const fetchArchivedAppointments = async (options: { silent?: boolean } = {}) => {
     if (!options.silent) setLoading(true)
     try {
-      const token = localStorage.getItem('token') || ''
-      const res = await apiGetArchived(token)
+      const res = await apiGetArchived()
       if (res.success) {
         const mapped = res.data.map((a: AppointmentData) => ({
           id: a.id,
@@ -177,8 +173,7 @@ export function AppointmentsProvider({ children }: { children: ReactNode }) {
 
   const updateStatus = async (id: number, status: AppointmentStatus): Promise<ActionResult> => {
     try {
-      const token = localStorage.getItem('token') || ''
-      const res = await updateAppointmentStatus(id, status.toLowerCase(), token)
+      const res = await updateAppointmentStatus(id, status.toLowerCase())
       if (res.success) {
         setAppointments(prev =>
           prev.map(app => app.id === id ? { ...app, status } : app)
@@ -194,8 +189,7 @@ export function AppointmentsProvider({ children }: { children: ReactNode }) {
   // Soft delete — removes from active list, moves to archived
   const deleteAppointment = async (id: number): Promise<ActionResult> => {
     try {
-      const token = localStorage.getItem('token') || ''
-      const res = await apiDeleteAppointment(id, token)
+      const res = await apiDeleteAppointment(id)
       if (res.success) {
         const deleted = appointments.find(a => a.id === id)
         if (deleted) {

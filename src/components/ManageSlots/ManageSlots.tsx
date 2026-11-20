@@ -5,12 +5,14 @@ import './ManageSlots.css'
 import { useServices } from '../../contexts/ServicesContext'
 import { useSlots, TimeSlot } from '../../contexts/SlotsContext'
 import { useToast } from '../../contexts/ToastContext'
+import { useConfirm } from '../../contexts/ConfirmContext'
 import { toLocalDateString, formatDisplayTime } from '../../utils/date'
 
 function ManageSlots() {
   const { services } = useServices()
   const { slots, deleteSlot, fetchSlots } = useSlots()
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [selectedServiceId, setSelectedServiceId] = useState<number | 'all'>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -43,7 +45,7 @@ function ManageSlots() {
       return
     }
     const label = `${slot.serviceName} at ${formatDisplayTime(slot.time)}`
-    if (!window.confirm(`Delete the slot for ${label}?`)) return
+    if (!await confirm(`Delete the slot for ${label}?`, { title: 'Delete slot', confirmText: 'Delete', danger: true })) return
     setDeletingId(slot.id)
     await deleteSlot(slot.id)
     setDeletingId(null)

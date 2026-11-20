@@ -4,6 +4,7 @@ import {
   useAppointments, Appointment, AppointmentStatus, ActionResult, isMissed,
 } from '../../contexts/AppointmentsContext'
 import { useToast } from '../../contexts/ToastContext'
+import { useConfirm } from '../../contexts/ConfirmContext'
 import { formatDisplayDate, formatDisplayTime, toLocalDateString } from '../../utils/date'
 import './ManageAppointments.css'
 
@@ -23,6 +24,7 @@ function ManageAppointments() {
     deleteAppointment,
   } = useAppointments()
   const { showToast } = useToast()
+  const confirm = useConfirm()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<AppointmentStatus | 'All'>('All')
@@ -97,18 +99,18 @@ function ManageAppointments() {
   }
 
   // Only one person should be "Serving" per service per day; warn before starting another
-  const handleStart = (appointment: Appointment) => {
+  const handleStart = async (appointment: Appointment) => {
     const alreadyServing = appointments.find(a =>
       a.id !== appointment.id && a.status === 'Serving' &&
       a.service === appointment.service && a.date === appointment.date)
-    if (alreadyServing && !window.confirm(
+    if (alreadyServing && !await confirm(
       `#${alreadyServing.queueNumber} (${alreadyServing.userName}) is still being served for ${appointment.service}. ` +
-      `Start #${appointment.queueNumber} anyway?`)) return
+      `Start #${appointment.queueNumber} anyway?`, { title: 'Someone is still being served', confirmText: 'Start anyway' })) return
     runAction(appointment, startAppointment, `Now serving #${appointment.queueNumber}`)
   }
 
-  const handleArchive = (appointment: Appointment) => {
-    if (!window.confirm(`Archive appointment #${appointment.queueNumber} (${appointment.userName})?`)) return
+  const handleArchive = async (appointment: Appointment) => {
+    if (!await confirm(`Archive appointment #${appointment.queueNumber} (${appointment.userName})?`, { title: 'Archive appointment', confirmText: 'Archive', danger: true })) return
     runAction(appointment, deleteAppointment, 'Appointment archived')
   }
 

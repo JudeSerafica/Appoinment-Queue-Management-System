@@ -5,6 +5,7 @@ import {
   useAppointments, Appointment, isActiveAppointment, isCancellable, displayStatus,
 } from '../../contexts/AppointmentsContext'
 import { useToast } from '../../contexts/ToastContext'
+import { useConfirm } from '../../contexts/ConfirmContext'
 import { getQueueStatus, QueueStatusData } from '../../api/routes'
 import { formatDisplayDate, formatDisplayTime, formatMinutes, toLocalDateString } from '../../utils/date'
 import './QueueStatus.css'
@@ -31,6 +32,7 @@ const STATUS_LABEL: Record<string, string> = {
 function QueueStatus({ onViewPastAppointment, onBookNew }: QueueStatusProps) {
   const { appointments, fetchUserAppointments, cancelAppointment } = useAppointments()
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [queueInfo, setQueueInfo] = useState<Record<number, QueueStatusData>>({})
   const [firstLoad, setFirstLoad] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -43,10 +45,9 @@ function QueueStatus({ onViewPastAppointment, onBookNew }: QueueStatusProps) {
     if (!user?.id) return
     if (!silent) setRefreshing(true)
     try {
-      const token = localStorage.getItem('token') || ''
       const [, queueRes] = await Promise.all([
         fetchUserAppointments(String(user.id), { silent: true }),
-        getQueueStatus(token),
+        getQueueStatus(),
       ])
       if (queueRes.success) {
         const map: Record<number, QueueStatusData> = {}
@@ -84,7 +85,9 @@ function QueueStatus({ onViewPastAppointment, onBookNew }: QueueStatusProps) {
 
   const handleCancel = async (apt: Appointment) => {
     const when = `${formatDisplayDate(apt.date)} at ${formatDisplayTime(apt.time)}`
-    if (!window.confirm(`Cancel your ${apt.service} appointment on ${when}?`)) return
+    if (!await confirm(`Cancel your ${apt.service} appointment on ${when}?`, {
+      title: 'Cancel appointment', confirmText: 'Yes, cancel it', cancelText: 'Keep it', danger: true,
+    })) return
     setCancellingId(apt.id)
     const res = await cancelAppointment(apt.id)
     setCancellingId(null)

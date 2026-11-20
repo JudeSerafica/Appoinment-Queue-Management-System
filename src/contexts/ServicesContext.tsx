@@ -65,14 +65,13 @@ export function ServicesProvider({ children }: { children: ReactNode }) {
   // ✅ Calls PUT /services via routes.ts, updates local state only on success
   const updateService = async (updatedService: Service): Promise<boolean> => {
     try {
-      const token = localStorage.getItem('token') || ''
       const res = await apiUpdateService({
         id:          updatedService.id,
         name:        updatedService.name,
         description: updatedService.description ?? '',
         duration:    updatedService.duration,
         is_active:   updatedService.status === 'Active' ? 1 : 0,
-      }, token)
+      })
 
       if (res.success) {
         setServices(prev =>
@@ -92,8 +91,7 @@ export function ServicesProvider({ children }: { children: ReactNode }) {
   // Calls DELETE /services; removes from the list only if the server succeeded
   const deleteService = async (id: number): Promise<{ success: boolean; message: string }> => {
     try {
-      const token = localStorage.getItem('token') || ''
-      const res = await apiDeleteService(id, token)
+      const res = await apiDeleteService(id)
       if (res.success) {
         setServices(prev => prev.filter(s => s.id !== id))
         return { success: true, message: '' }

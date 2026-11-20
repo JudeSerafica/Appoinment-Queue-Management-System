@@ -116,7 +116,6 @@ function AddSlotModal({ onClose, onAddSlot, onDone, selectedDate, services }: Ad
     setTotal(futureSlots.length)
 
     try {
-      const token = localStorage.getItem('token') || ''
       const svc = activeServices.find(s => s.id === formData.serviceId)
 
       let failCount = 0
@@ -129,7 +128,7 @@ function AddSlotModal({ onClose, onAddSlot, onDone, selectedDate, services }: Ad
           slot_date: dateStr,
           slot_time: time,
           capacity: formData.capacity,
-        }, token)
+        })
 
         if (res.success && svc) {
           onAddSlot({
@@ -270,9 +269,9 @@ function AddSlotModal({ onClose, onAddSlot, onDone, selectedDate, services }: Ad
 
           {/* Progress bar shown while loading */}
           {loading && (
-            <div className="progress-wrap">
-              <div className="progress-bar" style={{ width: `${progressPct}%` }} />
-              <span className="progress-label">{progress} / {total} created</span>
+            <div className="slot-progress-wrap">
+              <div className="slot-progress-bar" style={{ width: `${progressPct}%` }} />
+              <span className="slot-progress-label">{progress} / {total} created</span>
             </div>
           )}
 

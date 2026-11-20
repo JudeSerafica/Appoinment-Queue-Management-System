@@ -2,6 +2,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar'
 import AdminDashboardContent from '../../components/AdminDashboardContent/AdminDashboardContent'
 import './AdminDashboard.css'
+import { useConfirm } from '../../contexts/ConfirmContext'
 
 interface AdminDashboardProps {
   onLogout: () => void
@@ -16,6 +17,7 @@ function getAdminName(): string {
 
 function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const navigate = useNavigate()
+  const confirm = useConfirm()
   const { tab } = useParams()
 
   // Active tab lives in the URL so refresh and the Back button keep the page
@@ -25,8 +27,8 @@ function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const goTo = (page: AdminTab) =>
     navigate(page === 'dashboard' ? '/admin/dashboard' : `/admin/dashboard/${page}`)
 
-  const handleLogout = () => {
-    if (!window.confirm('Are you sure you want to log out?')) return
+  const handleLogout = async () => {
+    if (!await confirm('Are you sure you want to log out?', { title: 'Log out', confirmText: 'Log out' })) return
     onLogout()
     navigate('/admin')
   }
